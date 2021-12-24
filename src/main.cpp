@@ -6,7 +6,7 @@
 #define BMP280_ADDRESS 0x76
 
 // -------- DEFAULT SKETCH PARAMETERS --------
-const int SKETCH_VERSION = 5; 
+const int SKETCH_VERSION = 10; 
 
 ESPWiFi espwifi("ESP12-F");
 
@@ -16,6 +16,8 @@ void main_code(){
 
 	pinMode(14, OUTPUT);
 	digitalWrite(14, HIGH);
+
+	delay(3000);
 
 	espwifi.readFile("bmp.txt", data);
 
@@ -28,8 +30,11 @@ void main_code(){
 					Adafruit_BMP280::FILTER_X16,      /* Filtering. */
 					Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
-		float temperature = bmp.readTemperature();
-		float pressure = bmp.readPressure() / 100;
+		String temperature = String(bmp.readTemperature(), 1);
+		String pressure =  String(bmp.readPressure() / 100, 1);
+
+		temperature.replace(".", ",");
+		pressure.replace(".", ",");
 
 		if ((String)temperature != data["temperature"] || (String)pressure != data["pressure"]){
 			espwifi.sendHTTPJsonData(
