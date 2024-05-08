@@ -1,6 +1,7 @@
 #include "utils.h"
 
 ESPUtils::ESPUtils(){
+	
 }
 
 ESPUtils::~ESPUtils(){
@@ -59,6 +60,60 @@ void ESPUtils::readFile(String filename, String &data) {
 	file.close();
 }
 
+void ESPUtils::listDir(const char * dirname, uint8_t levels){
+	mountFS();
+
+    Serial.printf("Listing directory: %s\r\n", dirname);
+
+    File root = LittleFS.open(dirname, "r");
+    if(!root){
+        Serial.println("- failed to open directory");
+        return;
+    }
+    if(!root.isDirectory()){
+        Serial.println(" - not a directory");
+        return;
+    }
+
+    File file = root.openNextFile();
+    while(file){
+        if(file.isDirectory()){
+            Serial.print("  DIR : ");
+            Serial.print(file.name());
+            time_t t= file.getLastWrite();
+            struct tm * tmstruct = localtime(&t);
+            Serial.printf(
+				"  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\n",
+				(tmstruct->tm_year)+1900,
+				(tmstruct->tm_mon)+1,
+				tmstruct->tm_mday,tmstruct->tm_hour, 
+				tmstruct->tm_min, tmstruct->tm_sec
+			);
+
+            if(levels){
+                listDir(file.name(), levels -1);
+            }
+        } else {
+            Serial.print("  FILE: ");
+            Serial.print(file.name());
+            Serial.print("  SIZE: ");
+            Serial.print(file.size());
+            time_t t= file.getLastWrite();
+            struct tm * tmstruct = localtime(&t);
+            Serial.printf(
+				"  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\n",
+				(tmstruct->tm_year)+1900,
+				(tmstruct->tm_mon)+1,
+				tmstruct->tm_mday,
+				tmstruct->tm_hour,
+				tmstruct->tm_min,
+				tmstruct->tm_sec
+			);
+        }
+        file = root.openNextFile();
+    }
+}
+
 bool ESPUtils::getHTTPJsonData(String url, JSONVar &result) {
 	HTTPClient http;
 
@@ -89,9 +144,5 @@ bool ESPUtils::sendHTTPJsonData(String url, JSONVar data) {
 }
 
 t_httpUpdate_return ESPUtils::updateSketch(String url){
-	#if defined(ESP32)
-		return ESPhttpUpdate.update(url);
-	#else
-  		return ESPhttpUpdate.update(client, url);
-	#endif
+  	return ESPhttpUpdate.update(client, url);
 }

@@ -4,9 +4,12 @@
 #include <Wire.h>
 
 #define BMP280_ADDRESS 0x76
+#define BMP280_POWER_PIN 14
+#define BMP280_SDA_PIN 12
+#define BMP280_SCL_PIN 13
 
 // -------- DEFAULT SKETCH PARAMETERS --------
-const int SKETCH_VERSION = 10; 
+const int SKETCH_VERSION = 11; 
 
 ESPWiFi espwifi("ESP12-F");
 
@@ -14,14 +17,14 @@ void main_code(){
 	JSONVar data;
 	Adafruit_BMP280 bmp;
 
-	pinMode(14, OUTPUT);
-	digitalWrite(14, HIGH);
+	pinMode(BMP280_POWER_PIN, OUTPUT);
+	digitalWrite(BMP280_POWER_PIN, HIGH);
 
 	delay(3000);
 
 	espwifi.readFile("bmp.txt", data);
 
-	Wire.begin(12, 13);
+	Wire.begin(BMP280_SDA_PIN, BMP280_SCL_PIN);
 
     if (bmp.begin(BMP280_ADDRESS)) {
 		bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, /* Operating Mode. */
@@ -37,20 +40,21 @@ void main_code(){
 		pressure.replace(".", ",");
 
 		if ((String)temperature != data["temperature"] || (String)pressure != data["pressure"]){
-			espwifi.sendHTTPJsonData(
-				espwifi.dataUrl + "/esp/temperature?mac=" + WiFi.macAddress(),
-				data
-			);
+			String dataUrl = espwifi.dataUrl + "/esp/temperature?mac=" + WiFi.macAddress();
 
-			data["temperature"] = temperature; 
-			data["pressure"] = pressure;
-			espwifi.saveFile("bmp.txt", data);
+			if (espwifi.sendHTTPJsonData(dataUrl, data)) {
+				data["temperature"] = temperature; 
+				data["pressure"] = pressure;
+				espwifi.saveFile("bmp.txt", data);
+			} else {
+				Serial.println("Could not send data to " + dataUrl + "!");
+			}
 		}
 	} else {
 		Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
 	}
 
-	digitalWrite(14, LOW);
+	digitalWrite(BMP280_POWER_PIN, LOW);
 	ESP.deepSleepInstant(3600e6);
 }
 

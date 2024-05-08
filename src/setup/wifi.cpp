@@ -3,14 +3,6 @@
 
 #include "wifi.h"
 
-#if defined(ESP32)
-#include <WebServer.h>
-WebServer server(8080);
-#else
-#include <ESP8266WebServer.h>
-ESP8266WebServer server(8080);
-#endif
-
 JSONVar ESPWiFi::wifiConfig;
 String ESPWiFi::espChipName;
 String ESPWiFi::otaUpdateUrl;
@@ -20,9 +12,9 @@ const String ESPWiFi::defaultWifiPassword = "ESPp@$$w0rd!";
 const String ESPWiFi::configFile = "/wifi_config.json";
 
 ESPWiFi::ESPWiFi(String chipName){
-    isWebServerRunning = false;
     espChipName = chipName;
     resetCount = 0;
+    server = new AsyncWebServer(80);
 }
 
 ESPWiFi::~ESPWiFi(){
@@ -92,95 +84,47 @@ void ESPWiFi::wifiConnect(){
         }
     }
     else {
-        LittleFS.format();
-
         WiFi.softAP(hostname, defaultWifiPassword);
 
-        server.on("/", HTTP_GET, ESPWiFi::handleMain);
-        server.on("/wifi/save", HTTP_POST, ESPWiFi::handleSave);
-        server.begin();
+        server->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+			request->send(LittleFS, "/html/config.html", "text/html");
+		});
 
-        isWebServerRunning = true;
+        server->on("/wifi/save", HTTP_POST, [](AsyncWebServerRequest *request){
+            if (request->hasArg("wifi_ssid") && request->hasArg("wifi_password")){
+                ESPUtils esputils;
+                ESPWiFi::wifiConfig["wifi_ssid"] = request->arg("wifi_ssid");
+                ESPWiFi::wifiConfig["wifi_password"] = request->arg("wifi_password");
+                ESPWiFi::wifiConfig["ota_update_url"] = request->arg("ota_update_url");
+                ESPWiFi::wifiConfig["data_url"] = request->arg("data_url");
+                ESPWiFi::wifiConfig["hostname"] = request->arg("hostname");
+
+                esputils.saveFile(ESPWiFi::configFile,  ESPWiFi::wifiConfig);
+
+                if (request->arg("restart_device") == "on") {
+                    ESP.reset();
+                } else {
+                    request->send(200, "text/html", "Accepted. Please restart device.");
+                }
+            } else {
+                request->send(400, "text/html", "Missing fields WIFI SSID or WIFI PASSWORD.");
+            }
+		});
+
+        server->begin();
     }
-}
-
-void ESPWiFi::handleSave(){
-    if (server.hasArg("wifi_ssid") && server.hasArg("wifi_password")){
-        ESPUtils esputils;
-        ESPWiFi::wifiConfig["wifi_ssid"] = server.arg("wifi_ssid");
-        ESPWiFi::wifiConfig["wifi_password"] = server.arg("wifi_password");
-        ESPWiFi::wifiConfig["ota_update_url"] = server.arg("ota_update_url");
-        ESPWiFi::wifiConfig["data_url"] = server.arg("data_url");
-        ESPWiFi::wifiConfig["hostname"] = server.arg("hostname");
-
-        esputils.saveFile(ESPWiFi::configFile,  ESPWiFi::wifiConfig);
-
-        if (server.arg("restart_device") == "on") {
-            server.send(200, "text/html", "Accepted. Restarting device automatically in 3 seconds.");
-            delay(3000);
-            #if defined(ESP32) 
-                ESP.restart();
-            #else
-                ESP.reset();
-            #endif
-        } else {
-            server.send(200, "text/html", "Accepted. Please restart device.");
-        }
-    } else {
-        server.send(400, "text/html", "Missing fields WIFI SSID or WIFI PASSWORD.");
-    }
-}
-
-void ESPWiFi::handleMain(){
-    ESPUtils esputils;
-    String data = "<html>"
-        "<title>Setup wifi</title>"
-        "<body>"
-        "    <form action=\"/wifi/save\" method=\"POST\">"
-        "        <table>"
-        "            <tr>"
-        "                <td>WIFI SSID:</td><td><input type=\"text\" name=\"wifi_ssid\"></td>"
-        "            </tr>"
-        "            <tr>"
-        "                <td>WIFI PASSWORD:</td><td><input type=\"password\" name=\"wifi_password\"></td>"
-        "            </tr>"
-        "            <tr>"
-        "                <td>HOSTNAME:</td><td><input type=\"text\" name=\"hostname\"></td>"
-        "            </tr>"
-        "            <tr>"
-        "                <td>OTA UPDATE URL (optional):</td><td><input type=\"text\" name=\"ota_update_url\"></td>"
-        "            </tr>"
-        "            <tr>"
-        "                <td>DATA URL (optional):</td><td><input type=\"text\" name=\"data_url\"></td>"
-        "            </tr>"
-        "            <tr>"
-        "                <td></td><td style=\"text-align: right\"><input type=\"checkbox\" name=\"restart_device\">Restart device</td>"
-        "            </tr>"
-        "            <tr>"
-        "                <td></td><td style=\"text-align: right\"><input type=\"submit\" value=\"save\"></td>"
-        "            </tr>"
-        "        </table>"
-        "    </form><br>"
-        "</body>"
-        "</html>";
-
-    server.send(200, "text/html", data);
 }
 
 void ESPWiFi::stateCheck(){
-    if (isWebServerRunning) {
-        server.handleClient();
-    } else {
-        if (digitalRead(0) == LOW){
-            if (resetCount > 500) {
-                removeFile(configFile);
-                resetCount = 0;
-            } else {
-                resetCount+=1;
-            }
-        } else {
+    if (digitalRead(0) == LOW){
+        if (resetCount > 500) {
+            removeFile(configFile);
             resetCount = 0;
+        } else {
+            resetCount+=1;
         }
+    } else {
+        resetCount = 0;
     }
 }
 

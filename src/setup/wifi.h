@@ -11,15 +11,13 @@ class ESPWiFi: public ESPUtils {
         static JSONVar wifiConfig;
 
         char *hostname;
-        bool isWebServerRunning;
         int resetCount;
+
+        AsyncWebServer *server;
 
     public:
         ESPWiFi(String chipName);
         ~ESPWiFi();
-
-        static void handleMain();
-        static void handleSave();
 
         void wifiConnect();
         void stateCheck();
