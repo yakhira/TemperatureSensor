@@ -1,8 +1,8 @@
-#define BLYNK_TEMPLATE_ID "TMPL4nRADNRad"
-#define BLYNK_TEMPLATE_NAME "Temperature Sensor"
-#define BOARD_BUTTON_PIN 5
-#define BLYNK_FIRMWARE_VERSION        "0.1.0"
-#define BLYNK_PRINT Serial
+#define BLYNK_TEMPLATE_ID       "TMPL4nRADNRad"
+#define BLYNK_TEMPLATE_NAME     "Temperature Sensor"
+#define BOARD_BUTTON_PIN        5
+#define BLYNK_FIRMWARE_VERSION  "0.1.0"
+#define BLYNK_PRINT             Serial
 #define APP_DEBUG
 #define BLYNK_DEBUG
 
@@ -15,6 +15,8 @@
 #define BMP280_POWER_PIN 14
 #define BMP280_SDA_PIN 12
 #define BMP280_SCL_PIN 13
+
+bool dataSent = false;
 
 void main_code()
 {
@@ -36,6 +38,7 @@ void main_code()
         float temperature = bmp.readTemperature();
         float pressure = bmp.readPressure() / 100;
 
+        delay(1000);
         if (!isnan(temperature) && !isnan(pressure))
         {
             Serial.println("Sending BMP280 sensor data to Blynk...");
@@ -49,6 +52,7 @@ void main_code()
 
             Serial.println("Sent BMP280 sensor data...");
         }
+        delay(1000);
     }
     else {
         Serial.println("Could not find a valid BMP280 sensor, check wiring, address, sensor ID!");
@@ -69,5 +73,13 @@ void setup()
 
 void loop() {
   BlynkEdgent.run();
-  if (Blynk.connected()) main_code();
+  if (Blynk.connected() && !dataSent) {
+    dataSent = true;
+    unsigned long otaWindow = millis();
+    while (millis() - otaWindow < 30000) {
+      BlynkEdgent.run();
+      delay(10);
+    }
+    main_code();
+  } 
 }
