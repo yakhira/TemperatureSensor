@@ -1,7 +1,7 @@
 #define BLYNK_TEMPLATE_ID       "TMPL4nRADNRad"
 #define BLYNK_TEMPLATE_NAME     "Temperature Sensor"
 #define BOARD_BUTTON_PIN        5
-#define BLYNK_FIRMWARE_VERSION  "0.1.0"
+#define BLYNK_FIRMWARE_VERSION  "0.1.2"
 #define BLYNK_PRINT             Serial
 #define APP_DEBUG
 #define BLYNK_DEBUG
@@ -24,12 +24,13 @@ void main_code()
     Adafruit_BMP280 bmp;
 
     digitalWrite(BMP280_POWER_PIN, HIGH);
-
-    delay(3000);
+    delay(500);
+  
     Wire.begin(BMP280_SDA_PIN, BMP280_SCL_PIN);
+    delay(500);
 
     if (bmp.begin(BMP280_ADDRESS)) {
-		bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, /* Operating Mode. */
+		  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, /* Operating Mode. */
 					Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
 					Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
 					Adafruit_BMP280::FILTER_X16,      /* Filtering. */
@@ -38,7 +39,7 @@ void main_code()
         float temperature = bmp.readTemperature();
         float pressure = bmp.readPressure() / 100;
 
-        delay(1000);
+        delay(200);
         if (!isnan(temperature) && !isnan(pressure))
         {
             Serial.println("Sending BMP280 sensor data to Blynk...");
@@ -76,7 +77,7 @@ void loop() {
   if (Blynk.connected() && !dataSent) {
     dataSent = true;
     unsigned long otaWindow = millis();
-    while (millis() - otaWindow < 30000) {
+    while (millis() - otaWindow < 60000) {
       BlynkEdgent.run();
       delay(10);
     }
